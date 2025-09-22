@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>可愛喜好量表</title>
+  <style>
+    :root{
+      --bg:#fffafc;
+      --card:#ffffff;
+      --accent:#ff91af;
+      --muted:#8b8b8b;
+      --danger:#ff5c8a;
+      --radius:16px;
+      --gap:12px;
+      font-family: "Comic Sans MS", "Noto Sans TC", sans-serif;
+    }
+    html,body{height:100%;margin:0;}
+    body{
+      background:linear-gradient(180deg, #fff0f5 0%, #fef9ff 100%);
+      display:flex;align-items:center;justify-content:center;
+      padding:24px;color:#333;
+    }
+    .card{
+      width:100%;max-width:720px;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:0 6px 20px rgba(255,145,175,0.2);
+      padding:28px;
+      text-align:center;
+    }
+    h1{margin:0 0 8px;font-size:22px;color:var(--accent);}
+    p.lead{margin:0 0 20px;color:var(--muted);}
+    .banner{
+      margin-bottom:20px;
+    }
+    .banner input{
+      width:100%;
+      padding:10px 14px;
+      border-radius:var(--radius);
+      border:2px solid #ffd1dc;
+      font-size:15px;
+      outline:none;
+      text-align:center;
+      transition:0.2s;
+    }
+    .banner input:focus{border-color:var(--accent);box-shadow:0 0 8px rgba(255,145,175,0.3);}
+    .scale{
+      display:flex;
+      gap:var(--gap);
+      flex-wrap:wrap;
+      justify-content:center;
+      margin-bottom:18px;
+    }
+    .option{
+      flex:1 1 100px;
+      max-width:120px;
+      background:#fff0f5;
+      border:2px solid #ffe4ec;
+      border-radius:var(--radius);
+      padding:12px;
+      cursor:pointer;
+      transition:0.2s;
+    }
+    .option:hover{transform:translateY(-4px);box-shadow:0 6px 12px rgba(255,145,175,0.2);}
+    .option input{display:none;}
+    .score{font-size:20px;font-weight:700;color:var(--accent);}
+    .label{font-size:13px;color:var(--muted);}
+    .option.selected{
+      background:#ffeaf1;
+      border-color:var(--accent);
+      box-shadow:0 6px 14px rgba(255,145,175,0.3);
+    }
+    .extra{margin-top:12px;}
+    .extra .option{
+      max-width:none;
+      background:#fff5f7;
+      border-color:#ffc1d6;
+    }
+    .extra .option.selected{
+      background:#ffe0eb;
+      border-color:var(--danger);
+      box-shadow:0 6px 14px rgba(255,92,138,0.3);
+    }
+    .btns{margin-top:18px;display:flex;gap:10px;justify-content:center;}
+    button{
+      border:0;padding:10px 16px;border-radius:var(--radius);
+      font-weight:600;cursor:pointer;font-size:15px;
+      transition:0.2s;
+    }
+    button.primary{background:var(--accent);color:#fff;}
+    button.secondary{background:#ffe4ec;color:var(--accent);}
+    button:hover{opacity:0.9;}
+    .last{margin-top:14px;font-size:13px;color:var(--muted);}
+    .toast{
+      position:fixed;bottom:20px;right:20px;
+      background:var(--accent);color:#fff;
+      padding:8px 14px;border-radius:var(--radius);
+      opacity:0;transform:translateY(10px);
+      transition:0.2s;
+    }
+    .toast.show{opacity:1;transform:translateY(0);}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>可愛喜好量表</h1>
+    <p class="lead">1=不喜歡但可接受 · 5=非常喜歡 · 旁邊還有「認真不喜歡」</p>
+
+    <!-- 可打字橫幅 -->
+    <div class="banner">
+      <input id="bannerInput" type="text" placeholder="輸入你的心情或留言（可留白）"/>
+    </div>
+
+    <form id="ratingForm">
+      <div class="scale">
+        <label class="option"><input type="radio" name="rating" value="1"><div class="score">1</div><div class="label">不喜歡<br>但可接受</div></label>
+        <label class="option"><input type="radio" name="rating" value="2"><div class="score">2</div><div class="label">普通喜歡</div></label>
+        <label class="option"><input type="radio" name="rating" value="3"><div class="score">3</div><div class="label">喜歡</div></label>
+        <label class="option"><input type="radio" name="rating" value="4"><div class="score">4</div><div class="label">很喜歡</div></label>
+        <label class="option"><input type="radio" name="rating" value="5"><div class="score">5</div><div class="label">非常喜歡</div></label>
+      </div>
+
+      <div class="extra">
+        <label class="option"><input type="radio" name="rating" value="extra"><div class="score" style="color:var(--danger)">認真不喜歡</div></label>
+      </div>
+
+      <div class="btns">
+        <button type="button" class="secondary" id="clearBtn">清除</button>
+        <button type="submit" class="primary">送出</button>
+      </div>
+      <div class="last" id="lastSelection">尚未選擇</div>
+    </form>
+  </div>
+  <div class="toast" id="toast">已儲存</div>
+
+  <script>
+    const form = document.getElementById("ratingForm");
+    const options = [...document.querySelectorAll(".option")];
+    const radios = [...document.querySelectorAll("input[name='rating']")];
+    const lastEl = document.getElementById("lastSelection");
+    const toast = document.getElementById("toast");
+    const bannerInput = document.getElementById("bannerInput");
+    const STORAGE_KEY="cute_rating_v1";
+
+    function updateUI(val){
+      options.forEach(opt=>{
+        const inp=opt.querySelector("input");
+        opt.classList.toggle("selected", inp.value===val);
+        inp.checked=(inp.value===val);
+      });
+    }
+    function label(val){
+      if(val==="extra") return "認真不喜歡";
+      if(val) return val+" 分";
+      return "尚未選擇";
+    }
+    function save(val,msg){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({val:val,msg:msg,t:Date.now()}));
+      lastEl.textContent=`上次：${label(val)} ${msg? " · 留言："+msg:""}`;
+      showToast("已儲存");
+    }
+    function load(){
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const d=JSON.parse(raw);
+        updateUI(d.val);
+        bannerInput.value=d.msg||"";
+        lastEl.textContent=`上次：${label(d.val)} ${d.msg? " · 留言："+d.msg:""}`;
+      }
+    }
+    function showToast(txt){
+      toast.textContent=txt;
+      toast.classList.add("show");
+      setTimeout(()=>toast.classList.remove("show"),1500);
+    }
+
+    form.addEventListener("submit",e=>{
+      e.preventDefault();
+      const sel=radios.find(r=>r.checked);
+      if(!sel){showToast("請選擇分數");return;}
+      save(sel.value,bannerInput.value.trim());
+    });
+    document.getElementById("clearBtn").onclick=()=>{
+      localStorage.removeItem(STORAGE_KEY);
+      updateUI(null);
+      bannerInput.value="";
+      lastEl.textContent="已清除";
+      showToast("已清除");
+    };
+
+    options.forEach(opt=>{
+      opt.addEventListener("click",()=>updateUI(opt.querySelector("input").value));
+    });
+    load();
+  </script>
+</body>
+</html>
